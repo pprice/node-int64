@@ -30,19 +30,52 @@ exports.testBufferCopy = function(test) {
   test.done();
 };
 
+
+exports.testToString = function(test) { 
+  var strings = [ 
+    '1',                   '0000000000000001',
+    '0',                   '0000000000000000',
+    '-1',                  'ffffffffffffffff',
+    '1152921504606846970', '0ffffffffffffffa',
+    '-115292150460',       'ffffffe5280d6544'
+  ]
+
+  for(var i = 0; i < strings.length; i += 2) { 
+    let str = strings[i];
+    let hex = strings[i + 1];
+
+    var fromString = new Int64(str);
+    test.equal(fromString.toString(), str);
+    test.equal(fromString.toOctetString(), hex);
+
+    var fromHex = new Int64('0x' + hex);
+    test.equal(fromHex.toString(), str);
+    test.equal(fromHex.toOctetString(), hex);
+  }
+
+  test.done();
+}
+
 exports.testValueRepresentation = function(test) {
   var args = [
     [0],                     '0000000000000000', 0,
     [1],                     '0000000000000001', 1,
     [-1],                    'ffffffffffffffff', -1,
     [1e18],                  '0de0b6b3a7640000', 1e18,
-    ['0001234500654321'],    '0001234500654321',     0x1234500654321,
-    ['0ff1234500654321'],    '0ff1234500654321',   0xff1234500654300, // Imprecise!
+    ['0x0001234500654321'],    '0001234500654321',     0x1234500654321,
+    ['0x0ff1234500654321'],    '0ff1234500654321',   0xff1234500654300, // Imprecise!
     [0xff12345, 0x654321],   '0ff1234500654321',   0xff1234500654300, // Imprecise!
     [0xfffaffff, 0xfffff700],'fffafffffffff700',    -0x5000000000900,
     [0xafffffff, 0xfffff700],'affffffffffff700', -0x5000000000000800, // Imprecise!
     ['0x0000123450654321'],  '0000123450654321',      0x123450654321,
-    ['0xFFFFFFFFFFFFFFFF'],  'ffffffffffffffff', -1
+    ['0xFFFFFFFFFFFFFFFF'],  'ffffffffffffffff', -1,
+    ['1'], '0000000000000001', 1,
+    ['2147483648'], '0000000080000000', 2147483648,
+    ['1000000000000000'], '00038d7ea4c68000', 1000000000000000,
+    ['10000000000000000'], '002386f26fc10000', 10000000000000000,
+    ['100000000000000000'], '016345785d8a0000', 100000000000000000,
+    ['9000000000000000000'], '7ce66c50e2840000', 9000000000000000000,
+    ['1152921504606846975'], '0fffffffffffffff', 1152921504606846975
   ];
 
   // Test constructor argments
@@ -54,7 +87,7 @@ exports.testValueRepresentation = function(test) {
     var x = new Int64();
     Int64.apply(x, a);
 
-    test.equal(x.toOctetString(), octets, 'Constuctor with ' + args.join(', '));
+    test.equal(x.toOctetString(), octets, 'Constuctor with ' + a.join(', '));
     test.equal(x.toNumber(true), number);
   }
 
