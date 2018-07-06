@@ -30,6 +30,7 @@
 // Useful masks and values for bit twiddling
 var MASK31 =  0x7fffffff, VAL31 = 0x80000000;
 var MASK32 =  0xffffffff, VAL32 = 0x100000000;
+var BIT32 = 4294967296;
 
 // Map for converting hex octets to strings
 var _HEX = [];
@@ -112,11 +113,44 @@ Int64.prototype = {
         if (hi > VAL32) throw new RangeError(hi  + ' is outside Int64 range');
         hi = hi | 0;
       } else if (typeof(hi) == 'string') {
-        hi = (hi + '').replace(/^0x/, '');
-        lo = hi.substr(-8);
-        hi = hi.length > 8 ? hi.substr(0, hi.length - 8) : '';
-        hi = parseInt(hi, 16);
-        lo = parseInt(lo, 16);
+
+        // Hex encoding
+        if(hi.substr(0, 2) == '0x') { 
+          hi = (hi + '').replace(/^0x/, '');
+          lo = hi.substr(-8);
+          hi = hi.length > 8 ? hi.substr(0, hi.length - 8) : '';
+          hi = parseInt(hi, 16);
+          lo = parseInt(lo, 16);
+        } else { 
+          var pos = 0;
+          var len = hi.length;
+          var raddix = 10;
+          var str = hi;
+          // Trim leading 0s
+          while(str[pos] === '0') {
+            pos++;
+          }
+
+          hi = 0;
+          lo = 0;
+          if (str[pos] === "-") pos++;
+          var sign = pos;
+          while (pos < len) {
+            var chr = parseInt(str[pos++], raddix);
+            if (!(chr >= 0)) break; // NaN
+            lo = lo * raddix + chr;
+            hi = hi * raddix + Math.floor(lo / BIT32);
+            lo %= BIT32;
+          }
+          if (sign) {
+            hi = ~hi;
+            if (lo) {
+              lo = BIT32 - lo;
+            } else {
+              hi++;
+            }
+          }
+        }
       } else {
         throw new Error(hi + ' must be a Number or String');
       }
@@ -177,9 +211,7 @@ Int64.prototype = {
    * Convert to a JS Number. Returns +/-Infinity for values that can't be
    * represented to integer precision.
    */
-  valueOf: function() {
-    return this.toNumber(false);
-  },
+
 
   /**
    * Return string value
@@ -187,7 +219,30 @@ Int64.prototype = {
    * @param radix Just like Number#toString()'s radix
    */
   toString: function(radix) {
-    return this.valueOf().toString(radix || 10);
+
+    var buffer = this.buffer;
+    var offset = this.offset;
+    var high = buffer.readUInt32BE(offset + 0);
+    var low = buffer.readUInt32BE(offset + 4);
+    var str = "";
+    var sign = (high & VAL31);
+    if (sign) {
+      high = ~high;
+      low = BIT32 - low;
+    }
+
+    radix = radix || 10;
+    while (1) {
+      var mod = (high % radix) * BIT32 + low;
+      high = Math.floor(high / radix);
+      low = Math.floor(mod / radix);
+      str = (mod % radix).toString(radix) + str;
+      if (!high && !low) break;
+    }
+    if (sign) {
+      str = "-" + str;
+    }
+    return str;
   },
 
   /**
